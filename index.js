@@ -10,7 +10,13 @@ app.use(cors({
     origin: '*'
 }));
 
+
 app.use('/uploads', express.static('upload'));
+
+app.use('/', (req, res) => {
+
+    res.send('good!');
+});
 
 app.post('/upload', (req, res) => {
     const {name, size, curChunkIdx, totalChunks} = req.query;
