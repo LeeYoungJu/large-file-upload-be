@@ -13,7 +13,7 @@ app.use(cors({
 
 app.use('/uploads', express.static('upload'));
 
-app.use('/', (req, res) => {
+app.get('/', (req, res) => {
 
     res.send('good!');
 });
