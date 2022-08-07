@@ -25,7 +25,8 @@ app.post('/upload-sync', (req, res) => {
     const isLastChunk = parseInt(curChunkIdx) === parseInt(totalChunks) - 1;
 
     const ext = name.split('.').pop();
-    const data = req.body.toString().split(',')[1];
+    const body = req.body.toString();
+    const data = body.substring(body.indexOf(',')+1)
     const buffer = Buffer.from(data, 'base64');
 
     const tempFileName = `${md5(name + req.ip)}.${ext}`;
@@ -44,60 +45,62 @@ app.post('/upload-sync', (req, res) => {
     }
 });
 
-app.post('/upload', (req, res) => {
+app.post('/upload', async (req, res) => {
     const {name, size, curChunkIdx, totalChunks} = req.query;
     const isFirstChunk = parseInt(curChunkIdx) === 0;
     const isLastChunk = parseInt(curChunkIdx) === parseInt(totalChunks) - 1;
 
     const ext = name.split('.').pop();
-    const data = req.body.toString().split(',')[1];
+    const body = req.body.toString();
+    const data = body.substring(body.indexOf(',')+1)
     const buffer = Buffer.from(data, 'base64');
 
     const tempName = md5(name);
     const tempDirPath = './tempUpload';
     const tempFileUploadPath = `${tempDirPath}/${tempName}`;
 
-    if(isFirstChunk) {
-        if(!fs.existsSync(tempDirPath)) {
-            fs.mkdirSync(tempDirPath);
-        }
-        if(!fs.existsSync(tempFileUploadPath)) {
-            fs.mkdirSync(tempFileUploadPath);
-        }
-    }
+    try {
 
-    fsPromises.writeFile(`${tempFileUploadPath}/${curChunkIdx}_${tempName}`, buffer);
+        if(isFirstChunk) {
+            if(!fs.existsSync(tempDirPath)) {
+                fs.mkdirSync(tempDirPath);
+            }
+            if(!fs.existsSync(tempFileUploadPath)) {
+                fs.mkdirSync(tempFileUploadPath);
+            }
+        }
 
-    if(isLastChunk) {
-        const finalFileName = `${md5(Date.now()).substring(0, 6)}.${ext}`;
-        const finalDirPath = './upload';
-        const finalFilePath = `${finalDirPath}/${finalFileName}`;
+        await fsPromises.writeFile(`${tempFileUploadPath}/${curChunkIdx}_${tempName}`, buffer)
         
-        const files = fs.readdirSync(tempFileUploadPath);
-        fsPromises.readdir(tempFileUploadPath)
-            .then(files => {
-                files.sort((a, b) => {
-                    return Number(a.split('_')[0]) - Number(b.split('_')[0]);
-                });
-                if(!fs.existsSync(finalDirPath)) {
-                    fs.mkdirSync(finalDirPath);
-                }
-                
-                files.forEach(file => {
-                    const data = fs.readFileSync(`${tempFileUploadPath}/${file}`)
-                    fs.appendFileSync(finalFilePath, data);
-                });
-        
-                fsPromises.rm(tempFileUploadPath, {recursive: true, force: true})
-                    .then(() => {
-                        res.json({
-                            finalFileName
-                        });
-                    });
+        if(isLastChunk) {
+            const finalFileName = `${md5(Date.now()).substring(0, 6)}.${ext}`;
+            const finalDirPath = './upload';
+            const finalFilePath = `${finalDirPath}/${finalFileName}`;
+            
+            const files = await fsPromises.readdir(tempFileUploadPath);
+            files.sort((a, b) => {
+                return Number(a.split('_')[0]) - Number(b.split('_')[0]);
             });
-    } else {
-        res.send('ok');
+            if(!fs.existsSync(finalDirPath)) {
+                fs.mkdirSync(finalDirPath);
+            }
+            
+            files.forEach(file => {
+                const data = fs.readFileSync(`${tempFileUploadPath}/${file}`)
+                fs.appendFileSync(finalFilePath, data);
+            });
+
+            await fsPromises.rm(tempFileUploadPath, {recursive: true, force: true})
+            res.json({
+                finalFileName,
+            });
+        } else {
+            res.send('ok');
+        }
+    } catch(err) {
+        res.json({err});
     }
+
 });
 
 
